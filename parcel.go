@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 )
 
 type ParcelStore struct {
@@ -21,12 +20,12 @@ func (s ParcelStore) Add(p Parcel) (int, error) {
 		sql.Named("address", p.Address),
 		sql.Named("created_at", p.CreatedAt))
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
 	answer, err := res.LastInsertId()
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
 	return int(answer), nil
@@ -39,7 +38,7 @@ func (s ParcelStore) Get(number int) (Parcel, error) {
 	p := Parcel{}
 	err := res.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
 	if err != nil {
-		return p, err
+		return Parcel{}, err
 	}
 	return p, nil
 }
@@ -80,38 +79,28 @@ func (s ParcelStore) SetStatus(number int, status string) error {
 }
 
 func (s ParcelStore) SetAddress(number int, address string) error {
-	status := ""
-	res := s.db.QueryRow("SELECT status FROM parcel WHERE number = :number;",
-		sql.Named("number", number))
-	err := res.Scan(&status)
+	expectedStatus := ParcelStatusRegistered
+
+	_, err := s.db.Exec("UPDATE parcel SET address = :address WHERE number = :number AND status = :status;",
+		sql.Named("address", address),
+		sql.Named("number", number),
+		sql.Named("status", expectedStatus))
 	if err != nil {
 		return err
 	}
-	if status != ParcelStatusRegistered {
-		return errors.New("ERROR: status is not registered")
-	}
-
-	_, err = s.db.Exec("UPDATE parcel SET address = :address WHERE number = :number;",
-		sql.Named("address", address),
-		sql.Named("number", number))
 
 	return nil
 }
 
 func (s ParcelStore) Delete(number int) error {
-	status := ""
-	res := s.db.QueryRow("SELECT status FROM parcel WHERE number = :number;",
-		sql.Named("number", number))
-	err := res.Scan(&status)
+	expectedStatus := ParcelStatusRegistered
+
+	_, err := s.db.Exec("DELETE FROM parcel WHERE number = :number AND status = :status;",
+		sql.Named("number", number),
+		sql.Named("status", expectedStatus))
 	if err != nil {
 		return err
 	}
-	if status != ParcelStatusRegistered {
-		return errors.New("ERROR: status is not registered")
-	}
-
-	_, err = s.db.Exec("DELETE FROM parcel WHERE number = :number;",
-		sql.Named("number", number))
 
 	return nil
 }
